@@ -18,7 +18,7 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 OUT_DIR = ROOT_DIR / "out"
 MODEL_DIR = ROOT_DIR / "model"
-DOCS_DIR = CORE_DIR / "docs"
+DOCS_DIR = ROOT_DIR / "docs"
 LOG_DIR = ROOT_DIR / "logs"
 RUNS_DIR = ROOT_DIR / "runs"  # TensorBoard 日志目录
 
