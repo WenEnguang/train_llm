@@ -3,6 +3,12 @@
 预训练数据预处理：jsonl → .bin
 
 """
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 import os
 import json
 import time
@@ -10,6 +16,8 @@ import numpy as np
 from pathlib import Path
 from tokenizers import Tokenizer
 from rich import print as rprint
+from transformers import AutoTokenizer  # type:ignore
+from tqdm import tqdm
 
 from config import RAW_DATA_DIR,PROCESSED_DATA_DIR,MODEL_DIR
 
@@ -32,17 +40,18 @@ def preprocess_pretrain(
         add_bos: 是否加 BOS
         add_eos: 是否加 EOS
     """
-    if Path.exists(PROCESSED_DATA_DIR):
+    output_dir = Path(output_dir)   # type:ignore
+    if output_dir.exists(): #type:ignore
         pass
     else:
-        PROCESSED_DATA_DIR.mkdir(parents=True,exist_ok=True)
+        output_dir.mkdir(parents=True,exist_ok=True)    # type:ignore
 
     # ---------- 加载 tokenizer ----------
     rprint("[cyan]🔤 加载 tokenizer...[/cyan]")
-    tokenizer = Tokenizer.from_file(tokenizer_path)
-    vocab_size = tokenizer.get_vocab_size()
-    bos_id = tokenizer.token_to_id("<s>") or 1
-    eos_id = tokenizer.token_to_id("</s>") or 2
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    vocab_size = tokenizer.vocab_size
+    bos_id = tokenizer.convert_tokens_to_ids("<s>") or 1
+    eos_id = tokenizer.convert_tokens_to_ids("</s>") or 2
     dtype = np.uint16 if vocab_size <= 65535 else np.uint32
 
     # ---------- 第一步：统计 ----------
@@ -52,13 +61,16 @@ def preprocess_pretrain(
     num_lines = 0
     total_raw_tokens = 0
 
+    # 先统计总行数（用于进度条）
+    total_file_lines = sum(1 for line in open(input_path, 'r', encoding='utf-8'))
+
     with open(input_path, 'r', encoding='utf-8') as f:
-        for line in f:
+        for line in tqdm(f,total=total_file_lines,desc='统计进度'):
             text = json.loads(line.strip()).get('text', '')
             if not text.strip():
                 continue
             num_lines += 1
-            total_raw_tokens += len(tokenizer.encode(text).ids) + int(add_bos) + int(add_eos)
+            total_raw_tokens += len(tokenizer.encode(text, add_special_tokens=False)) + int(add_bos) + int(add_eos)
 
 
     #有效的Token数(末尾的token不再计算)
@@ -78,32 +90,33 @@ def preprocess_pretrain(
         shape=(total_valid,)
     )
 
-    write_pos = 0
-    for line in open(input_path,'r',encoding='utf-8'):
-        text = json.loads(line.strip()).get('text','')
-        if not text.strip():
-            continue
+    write_pos = 0   # 标记写入位置
+    with open(input_path,'r',encoding='utf-8') as f:
+        for line in tqdm(f,total=total_file_lines,desc='写入进度。。。'):
+            text = json.loads(line.strip()).get('text','')
+            if not text.strip():
+                continue
 
-        ids = tokenizer.encode(text).ids
+            ids = ids = tokenizer.encode(text, add_special_tokens=False)
 
-        # BOS
-        if add_bos + write_pos < total_valid:
-            all_tokens[write_pos] = bos_id
-            write_pos += 1
+            # BOS
+            if add_bos + write_pos < total_valid:
+                all_tokens[write_pos] = bos_id
+                write_pos += 1
 
-        # 正文截断
-        space = total_valid - write_pos
-        chunk = ids[:space]
-        all_tokens[write_pos:write_pos+len(chunk)] = chunk
-        write_pos += len(chunk)
+            # 正文截断
+            space = total_valid - write_pos
+            chunk = ids[:space]
+            all_tokens[write_pos:write_pos+len(chunk)] = chunk
+            write_pos += len(chunk)
 
-        # EOS
-        if add_eos + write_pos < total_valid:
-            all_tokens[write_pos] = eos_id
-            write_pos += 1
+            # EOS
+            if add_eos + write_pos < total_valid:
+                all_tokens[write_pos] = eos_id
+                write_pos += 1
 
-        if write_pos >= total_valid:
-            break
+            if write_pos >= total_valid:
+                break
 
     all_tokens.flush()
 
@@ -113,9 +126,17 @@ def preprocess_pretrain(
         "num_sequences": total_valid // max_seq_len,
         "seq_len": max_seq_len,
         "vocab_size": vocab_size,
-        "dtype": str(dtype),
+        "dtype": dtype.__name__,   # 存成 "uint16"
     }
     with open(output_dir / "pretrain_config.json", 'w') as f:   # type:ignore
         json.dump(config, f, indent=2)
 
-    rprint(f"[green]✅ 完成！序列数: {total_valid // max_seq_len:,}, 文件大小: {(output_dir/'pretrain_tokens.bin').stat().st_size/1024**2:.1f} MB[/green]")
+    rprint(f"[green]✅ 完成！序列数: {total_valid // max_seq_len:,}, 文件大小: {(output_dir/'pretrain_tokens.bin').stat().st_size/1024**2:.1f} MB[/green]") # type:ignore
+
+if __name__ == "__main__":
+    # tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+    preprocess_pretrain(
+        input_path= os.path.join(RAW_DATA_DIR,'pretrain_t2t_mini.jsonl'),
+        output_dir=str(PROCESSED_DATA_DIR),
+        tokenizer_path=str(MODEL_DIR),
+    )
