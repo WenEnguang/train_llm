@@ -7,5 +7,7 @@ checkpoints/
 # 运行日志目录
 runs/
 
+*.log
+
 .vscode/
 
