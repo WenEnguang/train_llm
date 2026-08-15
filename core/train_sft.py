@@ -221,6 +221,7 @@ def train(args):
     global_step = 0
     train_start = time.time()
     saved_ckpts = []
+    is_tty = sys.stdout.isatty()
     
     for epoch in range(args.epochs):
         epoch_start = time.time()
@@ -230,7 +231,9 @@ def train(args):
         for step, batch in tqdm(
             enumerate(dataloader, start=1),
             total=len(dataloader),
-            desc=f"Epoch {epoch+1}/{args.epochs}"
+            desc=f"Epoch {epoch+1}/{args.epochs}",
+            disable=not is_tty, # 非终端环境下彻底禁用进度条动画
+            mininterval=1.0,           # 即便是终端，也把默认0.1s刷新间隔放宽到1s，减少输出量
         ):
             input_ids, labels = batch
             input_ids = input_ids.to(device)
