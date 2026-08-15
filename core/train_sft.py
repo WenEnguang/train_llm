@@ -77,7 +77,7 @@ def parse_args():
     args.processed_dir = Path(args.processed_dir)
     args.checkpoint_dir = Path(args.checkpoint_dir)
     args.runs_dir = Path(args.runs_dir)
-    args.pretrain_ckpt = Path(args.pretrain_ckpt)   # ← 之前漏掉的
+    args.pretrain_ckpt = Path(args.pretrain_ckpt)   
     
     return args
 
@@ -87,29 +87,32 @@ def parse_args():
 # ═══════════════════════════════════════════
 
 class SFTDataset(Dataset):
-    """读取 SFT 预处理后的二维 .bin 文件"""
-    
-    def __init__(self, input_bin: Path, label_bin: Path, count: int, seq_len: int):
+    """读取 SFT 预处理后的二维 .bin 文件，dtype 从 meta 动态读取，避免读写不一致"""
+
+    _NUMPY_DTYPE_MAP = {
+        "int16": np.int16, "uint16": np.uint16,
+        "int32": np.int32, "uint32": np.uint32,
+    }
+
+    def __init__(self, input_bin: Path, label_bin: Path, count: int, seq_len: int,
+                 input_ids_dtype: str, labels_dtype: str):
+        input_np_dtype = self._NUMPY_DTYPE_MAP[input_ids_dtype]
+        labels_np_dtype = self._NUMPY_DTYPE_MAP[labels_dtype]
+
         self.input_ids = np.memmap(
-            str(input_bin),
-            dtype=np.int32,
-            mode="r",
-            shape=(count, seq_len),
+            str(input_bin), dtype=input_np_dtype, mode="r", shape=(count, seq_len),
         )
         self.labels = np.memmap(
-            str(label_bin),
-            dtype=np.int32,
-            mode="r",
-            shape=(count, seq_len),
+            str(label_bin), dtype=labels_np_dtype, mode="r", shape=(count, seq_len),
         )
-    
+
     def __len__(self):
         return self.input_ids.shape[0]
-    
+
     def __getitem__(self, idx):
         return (
-            torch.tensor(self.input_ids[idx].copy(), dtype=torch.long),
-            torch.tensor(self.labels[idx].copy(), dtype=torch.long),
+            torch.tensor(self.input_ids[idx].astype(np.int64)),  # ✅ uint16→int64需显式astype，直接tensor转换对uint16支持有限
+            torch.tensor(self.labels[idx].astype(np.int64)),
         )
 
 
@@ -161,6 +164,8 @@ def train(args):
         label_bin=args.processed_dir / meta["files"]["labels"],
         count=meta["count"],
         seq_len=meta["seq_len"],
+        input_ids_dtype=meta["input_ids_dtype"],   
+        labels_dtype=meta["labels_dtype"],          
     )
     logger.info(f"  对话数: {len(dataset):,}")
     logger.info(f"  序列长度: {meta['seq_len']}")
