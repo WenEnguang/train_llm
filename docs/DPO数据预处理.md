@@ -84,4 +84,4 @@ Tokenizing: 100%|█████████████████████
 DPO阶段数据预处理完成！样本数：27165，全零mask异常样本：494，seq_len（shift后）:767，耗时25.19s
 </details>
 
-之前在SFT阶段踩过坑，训练时的loss全为0。
+之前在SFT阶段踩过坑，训练时的loss全为0。`python test/check_dpo_max_len.py` 可以检查DPO数据的`max_seq_len`是否设置合理，避免训练时loss全为0的情况。
