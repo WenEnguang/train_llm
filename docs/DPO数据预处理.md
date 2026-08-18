@@ -69,4 +69,19 @@ DPO数据集总行数: 27165
 3. `process_one_side`里做了`next-token shift`：`x = input_ids[:-1]`，`y = input_ids[1:]`，mask 也同步右移对齐——DPO loss 原理标准做法，存储的序列长度是 `max_seq_len - 1`（也就是767），不是768。
 4. 防御性检查：如果 chosen 或 rejected 任一边出现全零 mask（说明 marker 没匹配上），统计占比超过5%就直接 raise，不会让这种问题一路带到训练阶段才暴露成 loss 异常。
 
+`python core/preprocess_dpo.py` 可以对DPO数据进行预处理，生成训练所需的`train_dpo_data.json`文件。
+<details>
+<summary>展开</summary>
 
+🔤 加载 tokenizer...
+assistant_start token ids: [1, 1388, 570, 811, 234]
+assistant_end   token ids: [2, 234]
+ids dtype: uint16, mask dtype: uint8
+第一遍扫描：统计信息...
+统计进度: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 27165/27165 [00:00<00:00, 264058.95it/s]
+第二遍：tokenize 并写入 memmap...
+Tokenizing: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 27165/27165 [00:25<00:00, 1081.03it/s]
+DPO阶段数据预处理完成！样本数：27165，全零mask异常样本：494，seq_len（shift后）:767，耗时25.19s
+</details>
+
+之前在SFT阶段踩过坑，训练时的loss全为0。
