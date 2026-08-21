@@ -2,7 +2,10 @@
 - LR曲线：warmup 到峰值再余弦衰减到 0，衰减终点落在 step 679,290（= 226,430 步/epoch × 3 epochs），scheduler 按预期工作，没有异常。
 - loss/epoch_avg曲线：loss 在训练过程中持续下降，降幅在收缩。
 - Loss/step：loss 在前 100k 步左右（大约 0.44 个 epoch）就从 2.2 快速跌到了 1.5~1.7 这个区间，然后从 100k 一直到 679k（剩下 85% 的训练量），loss 就在 1.4~1.8 这个噪声带里反复震荡，没有继续往下探底的趋势，均值大致持平。
+![[sft_lr.png]]
 
+![[sft_loss_avg.png]]
+![[sft_loss.png]]
 ### 目前存在的问题：
 1. 在训练过程中没有设置一份验证集，无法在训练过程中对模型进行评估和调优。
 2. 由于每一次的训练最后都只保留了一个checkpoint，无法对比不同 checkpoint 的性能差异，无法选择最优的 checkpoint。
