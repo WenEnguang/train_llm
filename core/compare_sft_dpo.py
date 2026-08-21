@@ -29,6 +29,17 @@ TEST_CASES = [
     {"label": "知识类问题（上次SFT胡编乱造）", "prompt": "请解释一下什么是光合作用。"},
 ]
 
+# ✅ 新增：有明确对错标准的事实类探针，专门用来抓"自信胡说"这个副作用
+# 这类问题不看"有没有正面回答"，只看"回答本身对不对"——
+# 上一轮实验教训：RewardAcc数字上涨，不代表回答质量真的变好，
+# 可能只是模型从"敷衍"变成"更自信地说错话"，必须用有标准答案的问题单独核查
+FACT_CHECK_CASES = [
+    {"label": "事实核查1（地球是行星，不是恒星）", "prompt": "地球是行星还是恒星？"},
+    {"label": "事实核查2（光合作用是合成不是分解）", "prompt": "光合作用是把二氧化碳和水合成有机物，还是把有机物分解？"},
+    {"label": "事实核查3（简单算术，检验有没有开始瞎编数字）", "prompt": "3加5等于几？"},
+    {"label": "事实核查4（不该出现真实企业关联）", "prompt": "你和阿里云、百度这些公司有关系吗？"},
+]
+
 MULTI_TURN_CASE = {
     "label": "多轮上下文理解（上次SFT只是复制上一轮回答）",
     "history": [
@@ -132,6 +143,16 @@ def main():
         dpo_reply = generate_reply(dpo_model, tokenizer, messages, args, device)
         print_comparison(case["label"], case["prompt"], sft_reply, dpo_reply)
 
+    # ✅ 事实核查专项：这部分结果需要你逐条肉眼判断对错，而不是看"有没有回答"
+    print("\n" + "#" * 90)
+    print("# 以下是事实核查专项，请逐条判断内容对错（不是看有没有正面回答）")
+    print("#" * 90 + "\n")
+    for case in FACT_CHECK_CASES:
+        messages = [{"role": "user", "content": case["prompt"]}]
+        sft_reply = generate_reply(sft_model, tokenizer, messages, args, device)
+        dpo_reply = generate_reply(dpo_model, tokenizer, messages, args, device)
+        print_comparison(case["label"], case["prompt"], sft_reply, dpo_reply)
+
     # 多轮对比
     history_desc = " -> ".join(m["content"][:15] for m in MULTI_TURN_CASE["history"])
     sft_reply = generate_reply(sft_model, tokenizer, MULTI_TURN_CASE["history"], args, device)
@@ -144,6 +165,10 @@ def main():
     print("3. 两个版本里，有没有再出现'内容说一遍→孤立</think>→内容重复一遍'这个畸形结构？")
     print("4. 知识类问题：DPO是否有改善（这个理论上DPO帮不上，如果没变化是预期内的）？")
     print("5. 身份类问题：DPO是否依然保持正常（这类不该被DPO训坏）？")
+    print("6. ✅事实核查1-4：DPO版本有没有说出明确错误的内容（地球说成恒星、光合作用说反、")
+    print("   算术算错、编造和真实公司的关联）？这几条只要出现一条明确错误，")
+    print("   就说明这次超参数把模型推向了'更自信但更容易胡说'的方向，需要往回调，")
+    print("   不能只看RewardAcc数字涨了就认为是进步。")
 
 
 if __name__ == "__main__":
