@@ -1,6 +1,12 @@
 #!/bin/bash
 
-# train_dpo.sh
+# ============================================================
+# 训练 DPO 模型 - 实验记录
+# ============================================================
+# 【参数变更记录】
+# 2026-08-20: lr 从 5e-8 调整到 5e-6、beta从0.1调整到0.3
+# 2026-08-21：实验开始从几何中点出发，保持beta=0.3不变，lr调整到5e-7
+# ============================================================
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -10,8 +16,8 @@ python train_dpo.py \
     --runs_dir /home/user/data/2025/wen/train_llm/runs \
     --sft_ckpt /home/user/data/2025/wen/train_llm/checkpoints/sft_h768_l8_lr2e-05_bs32_20260815_205446_final.pth \
     --epochs 2 \
-    --lr 4e-8 \
-    --beta 0.1 \
+    --lr 5e-7 \
+    --beta 0.3 \
     --micro_batch_size 4 \
     --effective_batch_size 16 \
     --seed 42 \
